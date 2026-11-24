@@ -1,0 +1,74 @@
+appId: com.workbuddy.console
+# productName 参与 exe / 安装目录命名，保持 ASCII 更稳；中文名放在快捷方式（用户可见处）
+productName: WorkBuddy Console
+directories:
+  buildResources: build
+  output: release
+files:
+  - dist/**
+  - electron/**
+  - server/**
+  - build/** # 运行时托盘图标也在 build/ 下，必须随包
+  - package.json
+# 会话整理/清理脚本必须落在真实磁盘才能被 spawn 执行（asar 内路径子进程读不到）：
+# 复制到 resources/cleanup/，服务端在打包环境按 process.resourcesPath 回退查找。
+extraResources:
+  - from: .
+    to: cleanup
+    filter:
+      - 汇总后自动整理.mjs
+      - 归档并清理.mjs
+      - 重复对话合并.mjs
+      - 合并内核.mjs
+# 统一产物命名（避免 productName 中的空格影响 Release 附件上传）
+artifactName: WorkBuddy-Console-${version}-${os}-${arch}.${ext}
+asar: true
+# maximum：安装包明显更小（实测 ~5-8MB），代价是打包时间从 ~1 分钟增至 3-5 分钟
+compression: maximum
+# 只保留中英文语言包：Electron 默认带 55 个语言的 locales（实测 48.3MB），
+# 本工具面向中文用户，其余 53 个 .pak 纯属浪费（约占安装包 6-8MB）
+electronLanguages:
+  - zh-CN
+  - en-US
+# 打包后删除 Chromium 的许可证 HTML（19.5MB 纯文档，不影响运行）
+afterPack: scripts/afterPack.cjs
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: workbuddy控制台
+  # 安装完成后不立即启动：控制台会驻留后台，交给用户自己挑时机打开
+  runAfterFinish: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+
+mac:
+  # 只出 dmg：dmg 与 zip 内容几乎相同（各 ~127MB），而本工具没有内置自动更新
+  # （升级走「跳浏览器下载」），zip 无人使用——双架构下白占 257MB Release 体积
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  icon: build/icon.icns
+  category: public.app-category.developer-tools
+  darkModeSupport: true
+  # 未购买 Apple 开发者证书：identity null 走 ad-hoc 签名，
+  # 用户首次打开需「右键 → 打开」或在系统设置里放行（README 有说明）
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  notarize: false
+
+dmg:
+  # 安装界面：左边应用、右边 Applications 快捷方式
+  contents:
+    - { x: 130, y: 220 }
+    - { x: 410, y: 220, type: link, path: /Applications }
+
+npmRebuild: false
